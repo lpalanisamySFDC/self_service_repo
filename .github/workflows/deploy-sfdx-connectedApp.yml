@@ -1,0 +1,48 @@
+name: Deploy SFDX Connected App
+
+on:
+  workflow_dispatch:
+    inputs:
+      SALESFORCE_ORG_URL:
+        description: 'Salesforce org URL'
+        required: true
+      SALESFORCE_ORG_USERNAME:
+        description: 'Salesforce org username'
+        required: true
+      SALESFORCE_ORG_PASSWORD:
+        description: 'Salesforce password+security token'
+        required: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up JDK 11
+        uses: actions/setup-java@v2
+        with:
+          java-version: '11'
+          distribution: 'adopt'
+      
+      - name: Build with Ant
+        run: |
+          SALESFORCE_ORG_PASSWORD=$(jq -r '.inputs.SALESFORCE_ORG_PASSWORD' $GITHUB_EVENT_PATH)
+          ant -buildfile build.xml \
+          -Dsf.username=${{ github.event.inputs.SALESFORCE_ORG_USERNAME }} \
+          -Dsf.passwordsecuritytoken=$SALESFORCE_ORG_PASSWORD \
+          -Dsf.serverurl=${{ github.event.inputs.SALESFORCE_ORG_URL }} \
+          deploy
+      
+      - name: Setup Git User
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "<>"
+          
+      - name: Push Changes to Repository
+        if: ${{ success() }}
+        run: |
+          rm -rf .github/workflows/deploy-sfdx-connectedApp.yml ant/ src/ build.xml
+          git add .
+          git commit -m "removing ant and sfdx connected app metadata"
+          git push -u origin --force
+          
